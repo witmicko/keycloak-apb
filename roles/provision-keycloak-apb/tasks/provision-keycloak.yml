@@ -12,18 +12,22 @@
   copy:
     src: standalone-ha.xml
     dest: /tmp/standalone-ha.xml
-  
-- name: debug that copy file  
-  shell: cat /tmp/standalone-ha.xml
-  register: copyfile
-  
+
+- name: current keycloak count
+  shell: echo $(($(oc get pod -n={{ namespace }} | grep {{ keycloak_service_name }} | wc -l) + 1))
+  register: keycloak_deployment_count
+
 - name: create keycloakcfg configmap from standalone-ha.xml file
   shell: oc create configmap keycloakcfg -n={{ namespace }} --from-file=/tmp/standalone-ha.xml 
   register: configmap
+  ignore_errors: yes
+
+- debug:
+      msg: ">>>keycloak_deployment_count {{ keycloak_deployment_count.stdout }}"
 
 - name: create keycloak k8s deployment
   k8s_extensions_v1beta1_deployment:
-    name: keycloak
+    name: keycloak-{{ keycloak_deployment_count.stdout }}
     namespace: '{{ namespace }}'
     labels:
       app: keycloak
@@ -65,7 +69,7 @@
             name: '{{ postgres_secret_name }}'
             key: database-name
       image: 'docker.io/jboss/keycloak-openshift:{{ keycloak_image_tag }}'
-      name: keycloak
+      name: keycloak-{{ keycloak_deployment_count.stdout}}
       ports:
       - container_port: 8080
         protocol: TCP
@@ -132,7 +136,7 @@
     dest: /tmp/keycloak-metrics-spi-1.0-SNAPSHOT.jar
 
 - name: Get the name of the keycloak pod
-  shell: oc get pods -n '{{ namespace }}' -o jsonpath='{.items[?(@.spec.containers[0].name=="keycloak")].metadata.name}'
+  shell: oc get pods -n '{{ namespace }}' -o jsonpath='{.items[?(@.spec.containers[0].name=="keycloak-{{ keycloak_deployment_count.stdout}}")].metadata.name}'
   register: keycloak_pod_name
   retries: 10
   until: '"keycloak" in keycloak_pod_name.stdout'
@@ -154,13 +158,16 @@
       USE_SHARED_SERVICE: "{{ USE_SHARED_SERVICE }}"
   when: encode_asb_binding
 
-- name: "Create keycloak secret template"
-  template:
-    src: secret.yml.j2
-    dest: /tmp/secret.yaml
+- block:
+  - name: "Create keycloak secret template"
+    template:
+      src: secret.yml.j2
+      dest: /tmp/secret.yaml
 
-- name: "Create keycloak secret"
-  shell: "oc create -f /tmp/secret.yaml -n {{ namespace }}"
+  - name: "Create keycloak secret"
+    shell: "oc create -f /tmp/secret.yaml -n {{ namespace }}"
 
-- name: "Delete secret template file"
-  file: path=/tmp/secret.yaml state=absent
+  - name: "Delete secret template file"
+    file: path=/tmp/secret.yaml state=absent
+    
+  when: keycloak_deployment_count.stdout |int == 0

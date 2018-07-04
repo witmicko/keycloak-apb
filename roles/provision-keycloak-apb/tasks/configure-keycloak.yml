@@ -27,6 +27,7 @@
     return_content: yes
   register: keycloak_realm_exists
 
+
 - name: Create {{ KEYCLOAK_REALM }} realm only when not exists
   uri:
     url: "{{ KEYCLOAK_HOST }}/auth/admin/realms"
@@ -46,6 +47,8 @@
 
 - name: Create keycloak configmap
   shell: oc create -f /tmp/configmap.yaml -n {{ namespace }}
+  ignore_errors: yes
 
 - name: delete configmap template file
   file: path=/tmp/configmap.yaml state=absent
+  ignore_errors: yes

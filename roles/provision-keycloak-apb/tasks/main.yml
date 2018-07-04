@@ -1,14 +1,14 @@
+
 - block:
+  - name: new keycloak or additional service instance
+    shell: echo $(oc get pod -n={{ namespace }} | grep {{ postgres_service_name }} | wc -l)
+    register: keycloak_postgres_count
+
+  - debug:
+      msg: ">>>keycloak_postgres_count {{ keycloak_postgres_count.stdout }}"
+
   - include_tasks: provision-postgres.yml
-    when:
-      - POSTGRESQL_EPHEMERAL is undefined or
-        not POSTGRESQL_EPHEMERAL
-
-  - include_tasks: provision-postgres-ephemeral.yml
-    when:
-      - POSTGRESQL_EPHEMERAL is defined or
-        POSTGRESQL_EPHEMERAL
-
+    when: keycloak_postgres_count.stdout |int == 0 
   - include_tasks: provision-keycloak.yml
   - include_tasks: configure-keycloak.yml
   vars:
