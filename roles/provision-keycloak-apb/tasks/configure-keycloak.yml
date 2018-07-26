@@ -1,0 +1,54 @@
+---
+- name: "Generate keycloak auth token"
+  uri:
+    url: "{{ KEYCLOAK_HOST }}/auth/realms/{{ keycloak_admin_realm_name }}/protocol/openid-connect/token"
+    method: POST
+    body: "client_id=admin-cli&username={{ ADMIN_USERNAME }}&password={{ ADMIN_PASSWORD }}&grant_type=password"
+    validate_certs: no
+  register: keycloak_auth_response
+  until: keycloak_auth_response.status == 200
+  retries: 600
+  delay: 2
+
+- name: Generate {{ KEYCLOAK_REALM }} specific realm
+  template:
+    src: keycloak_realm.json.j2
+    dest: /tmp/keycloak_realm.json
+
+- name: Get Keycloak Realm
+  uri:
+    url: "{{ KEYCLOAK_HOST }}/auth/admin/realms/{{ KEYCLOAK_REALM }}"
+    method: GET
+    validate_certs: no
+    body_format: json
+    headers:
+      Authorization: "bearer {{ keycloak_auth_response.json.access_token }}"
+    status_code: [200, 404]
+    return_content: yes
+  register: keycloak_realm_exists
+
+
+- name: Create {{ KEYCLOAK_REALM }} realm only when not exists
+  uri:
+    url: "{{ KEYCLOAK_HOST }}/auth/admin/realms"
+    method: POST
+    body: "{{ lookup('file','/tmp/keycloak_realm.json') }}"
+    validate_certs: no
+    body_format: json
+    headers:
+      Authorization: "bearer {{ keycloak_auth_response.json.access_token }}"
+    status_code: 201
+  when: keycloak_realm_exists.status == 404
+
+- name: Create keycloak configmap template
+  template:
+    src: configmap.yml.j2
+    dest: /tmp/configmap.yaml
+
+- name: Create keycloak configmap
+  shell: oc create -f /tmp/configmap.yaml -n {{ namespace }}
+  ignore_errors: yes
+
+- name: delete configmap template file
+  file: path=/tmp/configmap.yaml state=absent
+  ignore_errors: yes

@@ -1,12 +1,30 @@
-- include_tasks: label-serviceinstance.yml
 
-- include_tasks: provision-postgres.yml
-  when: POSTGRESQL_EPHEMERAL is undefined
+- block:
+  - name: new keycloak or additional service instance
+    shell: echo $(oc get pod -n={{ namespace }} | grep {{ postgres_service_name }} | wc -l)
+    register: keycloak_postgres_count
 
-- include_tasks: provision-postgres-ephemeral.yml
-  when: POSTGRESQL_EPHEMERAL is defined
+  - debug:
+      msg: ">>>keycloak_postgres_count {{ keycloak_postgres_count.stdout }}"
 
-- include_tasks: provision-keycloak.yml
+  - include_tasks: provision-postgres.yml
+    when: keycloak_postgres_count.stdout |int == 0 
+  - include_tasks: provision-keycloak.yml
+  - include_tasks: configure-keycloak.yml
+  vars:
+    KEYCLOAK_HOST: "{{ keycloak_protocol }}://{{ keycloak_route.stdout }}"
+    KEYCLOAK_REALM: "{{ CUSTOM_REALM_NAME|default(namespace, True) }}"
+  when: not USE_SHARED_SERVICE
+
+- block:
+  - include_tasks: configure-keycloak.yml
+  - include_tasks: addrealmuser-keycloak.yml
+  vars:
+    KEYCLOAK_HOST: "{{ SHARED_HOST | mandatory | regex_replace('/$') }}"
+    KEYCLOAK_REALM: "{{ CUSTOM_REALM_NAME|default(namespace, True) }}"
+  when:
+    - USE_SHARED_SERVICE
+    - SHARED_HOST is defined
 
 - include_role:
     name: oc-patch-file-to-configmap

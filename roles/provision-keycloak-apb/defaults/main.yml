@@ -3,11 +3,12 @@ playbook_debug: no
 keycloak_image_tag: 3.4.3.Final
 
 # Non global constants
-postgres_image: centos/postgresql-95-centos7
-postgres_image_tag: '9.5'
+postgres_image: docker.io/centos/postgresql-96-centos7
+postgres_image_tag: '9.6'
 postgres_database_name: keycloak
 
 # Keycloak dashboard config
 dashboards_configmap: grafana-dashboards-configmap
 dashboard_filename: keycloak-dashboard.json # name the file will have inside the config map
 dashboard_file_contents: "{{ lookup('file','../files/keycloak-dashboard.json') }}" # Contents of the dashboard file
+kcdev_realm_mgmt_jq: "[?clientId=='realm-management'].{name: clientId, id: id}"
