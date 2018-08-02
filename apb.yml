@@ -7,7 +7,7 @@ tags:
   - mobile-service
   - mobile-client-enabled
 metadata:
-  displayName: Identity Management
+  displayName: 2.Identity Management
   imageUrl: "https://pbs.twimg.com/profile_images/702119821979344897/oAC05cEB_400x400.png"
   documentationUrl: "https://docs.aerogear.org/external/apb/keycloak.html"
   providerDisplayName: "Red Hat, Inc."
@@ -31,6 +31,9 @@ plans:
         - '{"name": "CLIENT_ID", "value": "metadata.name", "type": "path"}'
         - '{"name": "CLIENT_TYPE", "value": "bearer", "type": "default"}'
     parameters: 
+    - name: TAG
+      required: True
+      type: string
     - name: ADMIN_USERNAME
       required: True
       default: admin
